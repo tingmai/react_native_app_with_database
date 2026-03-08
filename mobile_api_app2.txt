@@ -1,0 +1,846 @@
+Mobile Application 2 Using API
+
+---------------------------------
+###############################################
+
+package.json
+
+----------------------
+
+{
+  "name": "app3",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@react-navigation/native": "^7.1.33",
+    "@react-navigation/native-stack": "^7.14.4",
+    "axios": "^1.13.6",
+    "expo": "~54.0.33",
+    "expo-status-bar": "~3.0.9",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-gesture-handler": "~2.28.0",
+    "react-native-screens": "4.16.0"
+  },
+  "private": true
+}
+
+----------------------------
+
+########################################
+
+src/utils
+     -api.js
+
+---------------------
+
+import axios from 'axios';
+
+const BASE_URL = 'https://fakestoreapi.com';
+
+const api = axios.create({
+  baseURL: BASE_URL,
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+
+
+export default api;
+
+--------------------------
+
+######################################################
+
+App1.js
+
+
+--------------------------
+
+import React from 'react';
+import "react-native-screens"
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+
+import ProductList from './src/screens/ProductList';
+import ProductDetail from './src/screens/ProductDetail';
+
+const Stack = createNativeStackNavigator();
+
+const App = () => {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName="ProductList">
+        <Stack.Screen 
+          name="ProductList" 
+          component={ProductList} 
+         
+        />
+        <Stack.Screen 
+          name="ProductDetail" 
+          component={ProductDetail} 
+         
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+};
+
+export default App;
+
+
+
+----------------------------
+
+
+
+
+
+##################################################################
+
+
+src/screens
+    -ProductList.js
+  
+
+-----------------------------
+
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  Image,
+  StyleSheet,
+  ActivityIndicator,
+  TouchableOpacity,
+  Alert,
+  RefreshControl,
+} from 'react-native';
+import { productService } from '../services/productService';
+
+const ProductList = ({ navigation }) => {
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+
+  useEffect(() => {
+    fetchProducts();
+    fetchCategories();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const data = await productService.getAllProducts();
+      setProducts(data);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to fetch products');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const data = await productService.getAllCategories();
+      setCategories(['all', ...data]);
+    } catch (error) {
+      console.error('Failed to fetch categories', error);
+    }
+  };
+
+  const fetchProductsByCategory = async (category) => {
+    try {
+      setLoading(true);
+      if (category === 'all') {
+        await fetchProducts();
+      } else {
+        const data = await productService.getProductsByCategory(category);
+        setProducts(data);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to fetch products by category');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchProducts();
+    setRefreshing(false);
+  };
+
+  const handleCategoryPress = (category) => {
+    setSelectedCategory(category);
+    fetchProductsByCategory(category);
+  };
+
+  /*
+  const renderProductItem = ({ item }) => (
+    <TouchableOpacity 
+      style={styles.productCard}
+      onPress={() => Alert.alert('Product Details', `Title: ${item.title}\nPrice: $${item.price}`)}
+    >
+      <Image source={{ uri: item.image }} style={styles.productImage} />
+      <View style={styles.productInfo}>
+        <Text style={styles.productTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
+        <Text style={styles.productPrice}>${item.price}</Text>
+        <View style={styles.ratingContainer}>
+          <Text style={styles.rating}>★ {item.rating?.rate || 'N/A'}</Text>
+          <Text style={styles.reviewCount}>({item.rating?.count || 0} reviews)</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );*/
+
+  const renderProductItem = ({ item }) => (
+  <TouchableOpacity 
+    style={styles.productCard}
+    onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
+  >
+    <Image source={{ uri: item.image }} style={styles.productImage} />
+    <View style={styles.productInfo}>
+      <Text style={styles.productTitle} numberOfLines={2}>
+        {item.title}
+      </Text>
+      <Text style={styles.productPrice}>${item.price}</Text>
+      <View style={styles.ratingContainer}>
+        <Text style={styles.rating}>★ {item.rating?.rate || 'N/A'}</Text>
+        <Text style={styles.reviewCount}>({item.rating?.count || 0} reviews)</Text>
+      </View>
+    </View>
+  </TouchableOpacity>
+);
+
+
+  const renderCategoryItem = ({ item }) => (
+    <TouchableOpacity
+      style={[
+        styles.categoryButton,
+        selectedCategory === item && styles.selectedCategory,
+      ]}
+      onPress={() => handleCategoryPress(item)}
+    >
+      <Text
+        style={[
+          styles.categoryText,
+          selectedCategory === item && styles.selectedCategoryText,
+        ]}
+      >
+        {item.charAt(0).toUpperCase() + item.slice(1)}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {/* Categories List */}
+      <View style={styles.categoriesContainer}>
+        <FlatList
+          data={categories}
+          renderItem={renderCategoryItem}
+          keyExtractor={(item) => item}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesList}
+        />
+      </View>
+
+      {/* Products Grid */}
+      <FlatList
+        data={products}
+        renderItem={renderProductItem}
+        keyExtractor={(item) => item.id.toString()}
+        numColumns={2}
+        contentContainerStyle={styles.productsList}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No products found</Text>
+          </View>
+        }
+      />
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    paddingTop:50,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  categoriesContainer: {
+    backgroundColor: '#fff',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  categoriesList: {
+    paddingHorizontal: 10,
+  },
+  categoryButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginHorizontal: 4,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+  },
+  selectedCategory: {
+    backgroundColor: '#007AFF',
+  },
+  categoryText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  selectedCategoryText: {
+    color: '#fff',
+  },
+  productsList: {
+    padding: 8,
+  },
+  productCard: {
+    flex: 1,
+    margin: 8,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  productImage: {
+    width: '100%',
+    height: 120,
+    resizeMode: 'contain',
+    marginBottom: 8,
+  },
+  productInfo: {
+    flex: 1,
+  },
+  productTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
+    color: '#333',
+  },
+  productPrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#007AFF',
+    marginBottom: 4,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  rating: {
+    fontSize: 12,
+    color: '#FFA41C',
+    marginRight: 4,
+  },
+  reviewCount: {
+    fontSize: 12,
+    color: '#666',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+  },
+});
+
+export default ProductList;
+
+-------------------------------------------------
+
+######################################
+
+src/screens
+     - ProductDetail.js
+
+
+--------------------------
+
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  Share,
+} from 'react-native';
+import { productService } from '../services/productService';
+
+const ProductDetail = ({ route, navigation }) => {
+  const { productId } = route.params;
+  const [product, setProduct] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [quantity, setQuantity] = useState(1);
+
+  useEffect(() => {
+    fetchProductDetails();
+  }, []);
+
+  const fetchProductDetails = async () => {
+    try {
+      setLoading(true);
+      const data = await productService.getProductById(productId);
+      setProduct(data);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to fetch product details');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Check out this product: ${product.title} - $${product.price}`,
+        title: product.title,
+      });
+    } catch (error) {
+      Alert.alert('Error', 'Failed to share product');
+    }
+  };
+
+  const incrementQuantity = () => {
+    setQuantity(prev => prev + 1);
+  };
+
+  const decrementQuantity = () => {
+    if (quantity > 1) {
+      setQuantity(prev => prev - 1);
+    }
+  };
+
+  const handleAddToCart = () => {
+    Alert.alert(
+      'Added to Cart',
+      `${quantity} x ${product.title} added to your cart`,
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handleBuyNow = () => {
+    Alert.alert(
+      'Purchase',
+      `Proceed to purchase ${quantity} x ${product.title} for $${(product.price * quantity).toFixed(2)}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Buy Now', onPress: () => Alert.alert('Success', 'Purchase completed!') }
+      ]
+    );
+  };
+
+  const renderRatingStars = (rating) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+
+    for (let i = 1; i <= 5; i++) {
+      if (i <= fullStars) {
+        stars.push('★');
+      } else if (i === fullStars + 1 && hasHalfStar) {
+        stars.push('½');
+      } else {
+        stars.push('☆');
+      }
+    }
+
+    return (
+      <View style={styles.ratingContainer}>
+        <Text style={styles.ratingStars}>{stars.join(' ')}</Text>
+        <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
+      </View>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
+
+  if (!product) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Product not found</Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      {/* Product Image */}
+      <View style={styles.imageContainer}>
+        <Image source={{ uri: product.image }} style={styles.productImage} />
+        <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
+          <Text style={styles.shareButtonText}>📤</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Product Details */}
+      <View style={styles.detailsContainer}>
+        <Text style={styles.productTitle}>{product.title}</Text>
+        
+        <View style={styles.ratingRow}>
+          {renderRatingStars(product.rating?.rate || 0)}
+          <Text style={styles.reviewCount}>({product.rating?.count || 0} reviews)</Text>
+        </View>
+
+        <Text style={styles.productPrice}>${product.price}</Text>
+        
+        <View style={styles.divider} />
+
+        {/* Category */}
+        <View style={styles.categoryContainer}>
+          <Text style={styles.categoryLabel}>Category:</Text>
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryText}>{product.category}</Text>
+          </View>
+        </View>
+
+        {/* Description */}
+        <Text style={styles.sectionTitle}>Description</Text>
+        <Text style={styles.description}>{product.description}</Text>
+
+        {/* Quantity Selector */}
+        <Text style={styles.sectionTitle}>Quantity</Text>
+        <View style={styles.quantityContainer}>
+          <TouchableOpacity 
+            style={[styles.quantityButton, quantity === 1 && styles.quantityButtonDisabled]} 
+            onPress={decrementQuantity}
+            disabled={quantity === 1}
+          >
+            <Text style={styles.quantityButtonText}>−</Text>
+          </TouchableOpacity>
+          
+          <Text style={styles.quantityText}>{quantity}</Text>
+          
+          <TouchableOpacity 
+            style={styles.quantityButton} 
+            onPress={incrementQuantity}
+          >
+            <Text style={styles.quantityButtonText}>+</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Price Summary */}
+        <View style={styles.priceSummary}>
+          <Text style={styles.totalLabel}>Total:</Text>
+          <Text style={styles.totalPrice}>${(product.price * quantity).toFixed(2)}</Text>
+        </View>
+
+        {/* Action Buttons */}
+        <View style={styles.actionButtons}>
+          <TouchableOpacity 
+            style={[styles.button, styles.addToCartButton]} 
+            onPress={handleAddToCart}
+          >
+            <Text style={styles.addToCartButtonText}>Add to Cart</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.button, styles.buyNowButton]} 
+            onPress={handleBuyNow}
+          >
+            <Text style={styles.buyNowButtonText}>Buy Now</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Additional Info */}
+        <View style={styles.additionalInfo}>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Free Shipping</Text>
+            <Text style={styles.infoValue}>✓</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Returns</Text>
+            <Text style={styles.infoValue}>30 days</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Warranty</Text>
+            <Text style={styles.infoValue}>1 year</Text>
+          </View>
+        </View>
+      </View>
+    </ScrollView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 18,
+    color: '#666',
+  },
+  imageContainer: {
+    backgroundColor: '#fff',
+    padding: 20,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  productImage: {
+    width: 300,
+    height: 300,
+    resizeMode: 'contain',
+  },
+  shareButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shareButtonText: {
+    fontSize: 20,
+  },
+  detailsContainer: {
+    padding: 20,
+  },
+  productTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  ratingStars: {
+    fontSize: 16,
+    color: '#FFA41C',
+    marginRight: 5,
+  },
+  ratingText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  reviewCount: {
+    fontSize: 14,
+    color: '#999',
+  },
+  productPrice: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#007AFF',
+    marginBottom: 15,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginVertical: 15,
+  },
+  categoryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  categoryLabel: {
+    fontSize: 16,
+    color: '#666',
+    marginRight: 10,
+  },
+  categoryBadge: {
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+  },
+  categoryText: {
+    fontSize: 14,
+    color: '#333',
+    textTransform: 'capitalize',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  description: {
+    fontSize: 16,
+    color: '#666',
+    lineHeight: 24,
+  },
+  quantityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 15,
+  },
+  quantityButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quantityButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  quantityButtonText: {
+    fontSize: 24,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  quantityText: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginHorizontal: 20,
+    minWidth: 40,
+    textAlign: 'center',
+  },
+  priceSummary: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+    padding: 15,
+    borderRadius: 10,
+    marginVertical: 15,
+  },
+  totalLabel: {
+    fontSize: 18,
+    color: '#333',
+  },
+  totalPrice: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#007AFF',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  button: {
+    flex: 1,
+    paddingVertical: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  addToCartButton: {
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#007AFF',
+    marginRight: 10,
+  },
+  addToCartButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  buyNowButton: {
+    backgroundColor: '#007AFF',
+    marginLeft: 10,
+  },
+  buyNowButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  additionalInfo: {
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    paddingTop: 20,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+  },
+  infoLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  infoValue: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+});
+
+export default ProductDetail;
+
+
+
+-------------------------------
+
+
+#########################################
+
+
