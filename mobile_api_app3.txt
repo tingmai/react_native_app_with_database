@@ -1,0 +1,1483 @@
+Mobile Application 3 using API
+
+
+######################################
+
+package.json
+
+------------------
+
+{
+  "name": "app4",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@react-navigation/native": "^7.1.33",
+    "@react-navigation/native-stack": "^7.14.4",
+    "axios": "^1.13.6",
+    "expo": "~54.0.33",
+    "expo-router": "^55.0.4",
+    "expo-status-bar": "~3.0.9",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-gesture-handler": "^2.30.0",
+    "react-native-screens": "^4.16.0"
+  },
+  "private": true
+}
+
+
+
+-------------------
+
+############################################
+
+src/utils
+    - api.js
+
+-------------------------
+
+
+import axios from 'axios';
+
+const BASE_URL = 'https://fakestoreapi.com';
+
+const api = axios.create({
+  baseURL: BASE_URL,
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+
+
+export default api;
+
+
+
+----------------------------
+
+
+################################################
+
+App.js
+
+------------------
+
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import ProductList from './src/screens/ProductList';
+import ProductDetail from './src/screens/ProductDetail';
+import CreateProduct from './src/screens/CreateProduct';
+import { TouchableOpacity, Text } from 'react-native';
+
+const Stack = createNativeStackNavigator();
+
+const App = () => {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName="ProductList">
+        <Stack.Screen 
+          name="ProductList" 
+          component={ProductList} 
+          options={({ navigation }) => ({ 
+            title: 'Products',
+            headerStyle: {
+              backgroundColor: '#007AFF',
+            },
+            headerTintColor: '#fff',
+            headerTitleStyle: {
+              fontWeight: 'bold',
+            },
+            headerRight: () => (
+              <TouchableOpacity 
+                onPress={() => navigation.navigate('CreateProduct')}
+                style={{ marginRight: 15 }}
+              >
+                <Text style={{ color: '#fff', fontSize: 16 }}>Add +</Text>
+              </TouchableOpacity>
+            ),
+          })}
+        />
+        <Stack.Screen 
+          name="ProductDetail" 
+          component={ProductDetail} 
+          options={{ 
+            title: 'Product Details',
+            headerStyle: {
+              backgroundColor: '#007AFF',
+            },
+            headerTintColor: '#fff',
+            headerTitleStyle: {
+              fontWeight: 'bold',
+            },
+          }}
+        />
+        <Stack.Screen 
+          name="CreateProduct" 
+          component={CreateProduct} 
+          options={{ 
+            title: 'Create Product',
+            headerStyle: {
+              backgroundColor: '#007AFF',
+            },
+            headerTintColor: '#fff',
+            headerTitleStyle: {
+              fontWeight: 'bold',
+            },
+          }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+};
+
+export default App;
+
+
+
+---------------------------
+
+
+#################################################
+
+src/screens
+    -ProductList.js
+
+----------------------------------
+
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  Image,
+  StyleSheet,
+  ActivityIndicator,
+  TouchableOpacity,
+  Alert,
+  RefreshControl,
+} from 'react-native';
+import { productService } from '../services/productService';
+
+const ProductList = ({ navigation }) => {
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+
+  useEffect(() => {
+    fetchProducts();
+    fetchCategories();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const data = await productService.getAllProducts();
+      setProducts(data);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to fetch products');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const data = await productService.getAllCategories();
+      setCategories(['all', ...data]);
+    } catch (error) {
+      console.error('Failed to fetch categories', error);
+    }
+  };
+
+  const fetchProductsByCategory = async (category) => {
+    try {
+      setLoading(true);
+      if (category === 'all') {
+        await fetchProducts();
+      } else {
+        const data = await productService.getProductsByCategory(category);
+        setProducts(data);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to fetch products by category');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchProducts();
+    setRefreshing(false);
+  };
+
+  const handleCategoryPress = (category) => {
+    setSelectedCategory(category);
+    fetchProductsByCategory(category);
+  };
+
+  /*
+  const renderProductItem = ({ item }) => (
+    <TouchableOpacity 
+      style={styles.productCard}
+      onPress={() => Alert.alert('Product Details', `Title: ${item.title}\nPrice: $${item.price}`)}
+    >
+      <Image source={{ uri: item.image }} style={styles.productImage} />
+      <View style={styles.productInfo}>
+        <Text style={styles.productTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
+        <Text style={styles.productPrice}>${item.price}</Text>
+        <View style={styles.ratingContainer}>
+          <Text style={styles.rating}>★ {item.rating?.rate || 'N/A'}</Text>
+          <Text style={styles.reviewCount}>({item.rating?.count || 0} reviews)</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );*/
+
+  const renderProductItem = ({ item }) => (
+  <TouchableOpacity 
+    style={styles.productCard}
+    onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
+  >
+    <Image source={{ uri: item.image }} style={styles.productImage} />
+    <View style={styles.productInfo}>
+      <Text style={styles.productTitle} numberOfLines={2}>
+        {item.title}
+      </Text>
+      <Text style={styles.productPrice}>${item.price}</Text>
+      <View style={styles.ratingContainer}>
+        <Text style={styles.rating}>★ {item.rating?.rate || 'N/A'}</Text>
+        <Text style={styles.reviewCount}>({item.rating?.count || 0} reviews)</Text>
+      </View>
+    </View>
+  </TouchableOpacity>
+);
+
+
+  const renderCategoryItem = ({ item }) => (
+    <TouchableOpacity
+      style={[
+        styles.categoryButton,
+        selectedCategory === item && styles.selectedCategory,
+      ]}
+      onPress={() => handleCategoryPress(item)}
+    >
+      <Text
+        style={[
+          styles.categoryText,
+          selectedCategory === item && styles.selectedCategoryText,
+        ]}
+      >
+        {item.charAt(0).toUpperCase() + item.slice(1)}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {/* Categories List */}
+      <View style={styles.categoriesContainer}>
+        <FlatList
+          data={categories}
+          renderItem={renderCategoryItem}
+          keyExtractor={(item) => item}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesList}
+        />
+      </View>
+
+      {/* Products Grid */}
+      <FlatList
+        data={products}
+        renderItem={renderProductItem}
+        keyExtractor={(item) => item.id.toString()}
+        numColumns={2}
+        contentContainerStyle={styles.productsList}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No products found</Text>
+          </View>
+        }
+      />
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    paddingTop:50,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  categoriesContainer: {
+    backgroundColor: '#fff',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  categoriesList: {
+    paddingHorizontal: 10,
+  },
+  categoryButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginHorizontal: 4,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+  },
+  selectedCategory: {
+    backgroundColor: '#007AFF',
+  },
+  categoryText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  selectedCategoryText: {
+    color: '#fff',
+  },
+  productsList: {
+    padding: 8,
+  },
+  productCard: {
+    flex: 1,
+    margin: 8,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  productImage: {
+    width: '100%',
+    height: 120,
+    resizeMode: 'contain',
+    marginBottom: 8,
+  },
+  productInfo: {
+    flex: 1,
+  },
+  productTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
+    color: '#333',
+  },
+  productPrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#007AFF',
+    marginBottom: 4,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  rating: {
+    fontSize: 12,
+    color: '#FFA41C',
+    marginRight: 4,
+  },
+  reviewCount: {
+    fontSize: 12,
+    color: '#666',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+  },
+});
+
+export default ProductList;
+
+
+-------------------------------------
+
+
+
+
+################################################
+
+
+src/screens
+     - ProductDetail.js
+
+-------------------------
+
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  Share,
+} from 'react-native';
+import { productService } from '../services/productService';
+
+const ProductDetail = ({ route, navigation }) => {
+  const { productId } = route.params;
+  const [product, setProduct] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [quantity, setQuantity] = useState(1);
+
+  useEffect(() => {
+    fetchProductDetails();
+  }, []);
+
+  const fetchProductDetails = async () => {
+    try {
+      setLoading(true);
+      const data = await productService.getProductById(productId);
+      setProduct(data);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to fetch product details');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Check out this product: ${product.title} - $${product.price}`,
+        title: product.title,
+      });
+    } catch (error) {
+      Alert.alert('Error', 'Failed to share product');
+    }
+  };
+
+  const incrementQuantity = () => {
+    setQuantity(prev => prev + 1);
+  };
+
+  const decrementQuantity = () => {
+    if (quantity > 1) {
+      setQuantity(prev => prev - 1);
+    }
+  };
+
+  const handleAddToCart = () => {
+    Alert.alert(
+      'Added to Cart',
+      `${quantity} x ${product.title} added to your cart`,
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handleBuyNow = () => {
+    Alert.alert(
+      'Purchase',
+      `Proceed to purchase ${quantity} x ${product.title} for $${(product.price * quantity).toFixed(2)}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Buy Now', onPress: () => Alert.alert('Success', 'Purchase completed!') }
+      ]
+    );
+  };
+
+  const renderRatingStars = (rating) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+
+    for (let i = 1; i <= 5; i++) {
+      if (i <= fullStars) {
+        stars.push('★');
+      } else if (i === fullStars + 1 && hasHalfStar) {
+        stars.push('½');
+      } else {
+        stars.push('☆');
+      }
+    }
+
+    return (
+      <View style={styles.ratingContainer}>
+        <Text style={styles.ratingStars}>{stars.join(' ')}</Text>
+        <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
+      </View>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
+
+  if (!product) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Product not found</Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      {/* Product Image */}
+      <View style={styles.imageContainer}>
+        <Image source={{ uri: product.image }} style={styles.productImage} />
+        <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
+          <Text style={styles.shareButtonText}>📤</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Product Details */}
+      <View style={styles.detailsContainer}>
+        <Text style={styles.productTitle}>{product.title}</Text>
+        
+        <View style={styles.ratingRow}>
+          {renderRatingStars(product.rating?.rate || 0)}
+          <Text style={styles.reviewCount}>({product.rating?.count || 0} reviews)</Text>
+        </View>
+
+        <Text style={styles.productPrice}>${product.price}</Text>
+        
+        <View style={styles.divider} />
+
+        {/* Category */}
+        <View style={styles.categoryContainer}>
+          <Text style={styles.categoryLabel}>Category:</Text>
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryText}>{product.category}</Text>
+          </View>
+        </View>
+
+        {/* Description */}
+        <Text style={styles.sectionTitle}>Description</Text>
+        <Text style={styles.description}>{product.description}</Text>
+
+        {/* Quantity Selector */}
+        <Text style={styles.sectionTitle}>Quantity</Text>
+        <View style={styles.quantityContainer}>
+          <TouchableOpacity 
+            style={[styles.quantityButton, quantity === 1 && styles.quantityButtonDisabled]} 
+            onPress={decrementQuantity}
+            disabled={quantity === 1}
+          >
+            <Text style={styles.quantityButtonText}>−</Text>
+          </TouchableOpacity>
+          
+          <Text style={styles.quantityText}>{quantity}</Text>
+          
+          <TouchableOpacity 
+            style={styles.quantityButton} 
+            onPress={incrementQuantity}
+          >
+            <Text style={styles.quantityButtonText}>+</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Price Summary */}
+        <View style={styles.priceSummary}>
+          <Text style={styles.totalLabel}>Total:</Text>
+          <Text style={styles.totalPrice}>${(product.price * quantity).toFixed(2)}</Text>
+        </View>
+
+        {/* Action Buttons */}
+        <View style={styles.actionButtons}>
+          <TouchableOpacity 
+            style={[styles.button, styles.addToCartButton]} 
+            onPress={handleAddToCart}
+          >
+            <Text style={styles.addToCartButtonText}>Add to Cart</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.button, styles.buyNowButton]} 
+            onPress={handleBuyNow}
+          >
+            <Text style={styles.buyNowButtonText}>Buy Now</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Additional Info */}
+        <View style={styles.additionalInfo}>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Free Shipping</Text>
+            <Text style={styles.infoValue}>✓</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Returns</Text>
+            <Text style={styles.infoValue}>30 days</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Warranty</Text>
+            <Text style={styles.infoValue}>1 year</Text>
+          </View>
+        </View>
+      </View>
+    </ScrollView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 18,
+    color: '#666',
+  },
+  imageContainer: {
+    backgroundColor: '#fff',
+    padding: 20,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  productImage: {
+    width: 300,
+    height: 300,
+    resizeMode: 'contain',
+  },
+  shareButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shareButtonText: {
+    fontSize: 20,
+  },
+  detailsContainer: {
+    padding: 20,
+  },
+  productTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  ratingStars: {
+    fontSize: 16,
+    color: '#FFA41C',
+    marginRight: 5,
+  },
+  ratingText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  reviewCount: {
+    fontSize: 14,
+    color: '#999',
+  },
+  productPrice: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#007AFF',
+    marginBottom: 15,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginVertical: 15,
+  },
+  categoryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  categoryLabel: {
+    fontSize: 16,
+    color: '#666',
+    marginRight: 10,
+  },
+  categoryBadge: {
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+  },
+  categoryText: {
+    fontSize: 14,
+    color: '#333',
+    textTransform: 'capitalize',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  description: {
+    fontSize: 16,
+    color: '#666',
+    lineHeight: 24,
+  },
+  quantityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 15,
+  },
+  quantityButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quantityButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  quantityButtonText: {
+    fontSize: 24,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  quantityText: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginHorizontal: 20,
+    minWidth: 40,
+    textAlign: 'center',
+  },
+  priceSummary: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+    padding: 15,
+    borderRadius: 10,
+    marginVertical: 15,
+  },
+  totalLabel: {
+    fontSize: 18,
+    color: '#333',
+  },
+  totalPrice: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#007AFF',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  button: {
+    flex: 1,
+    paddingVertical: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  addToCartButton: {
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#007AFF',
+    marginRight: 10,
+  },
+  addToCartButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  buyNowButton: {
+    backgroundColor: '#007AFF',
+    marginLeft: 10,
+  },
+  buyNowButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  additionalInfo: {
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    paddingTop: 20,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+  },
+  infoLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  infoValue: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+});
+
+export default ProductDetail;
+
+
+
+----------------------
+
+
+#####################################################
+
+
+src/screens
+    -CreateProduct.js
+
+--------------------------
+
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import { productService } from '../services/productService';
+
+const CreateProduct = ({ navigation }) => {
+  const [formData, setFormData] = useState({
+    title: '',
+    price: '',
+    description: '',
+    category: '',
+    image: '',
+  });
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const fetchCategories = async () => {
+    try {
+      setLoading(true);
+      const data = await productService.getAllCategories();
+      setCategories(data);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to fetch categories');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+
+    if (!formData.title.trim()) {
+      newErrors.title = 'Title is required';
+    } else if (formData.title.length < 3) {
+      newErrors.title = 'Title must be at least 3 characters';
+    }
+
+    if (!formData.price) {
+      newErrors.price = 'Price is required';
+    } else if (isNaN(formData.price) || parseFloat(formData.price) <= 0) {
+      newErrors.price = 'Please enter a valid price';
+    }
+
+    if (!formData.description.trim()) {
+      newErrors.description = 'Description is required';
+    } else if (formData.description.length < 10) {
+      newErrors.description = 'Description must be at least 10 characters';
+    }
+
+    if (!formData.category) {
+      newErrors.category = 'Please select a category';
+    }
+
+    if (!formData.image.trim()) {
+      newErrors.image = 'Image URL is required';
+    } else if (!isValidUrl(formData.image)) {
+      newErrors.image = 'Please enter a valid URL';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const isValidUrl = (url) => {
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear error for this field when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: null }));
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!validateForm()) {
+      Alert.alert('Validation Error', 'Please check all fields and try again');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      
+      // Prepare product data
+      const productData = {
+        title: formData.title,
+        price: parseFloat(formData.price),
+        description: formData.description,
+        category: formData.category,
+        image: formData.image,
+      };
+
+      const response = await productService.addProduct(productData);
+      
+      Alert.alert(
+        'Success',
+        'Product created successfully!',
+        [
+          {
+            text: 'View Products',
+            onPress: () => navigation.navigate('ProductList'),
+          },
+          {
+            text: 'Create Another',
+            onPress: () => {
+              setFormData({
+                title: '',
+                price: '',
+                description: '',
+                category: '',
+                image: '',
+              });
+              setErrors({});
+            },
+            style: 'cancel',
+          },
+        ]
+      );
+      
+      console.log('Created product:', response);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to create product. Please try again.');
+      console.error(error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCancel = () => {
+    Alert.alert(
+      'Discard Changes',
+      'Are you sure you want to discard this product?',
+      [
+        { text: 'Stay', style: 'cancel' },
+        { 
+          text: 'Discard', 
+          style: 'destructive',
+          onPress: () => navigation.goBack()
+        },
+      ]
+    );
+  };
+
+  const renderCategorySelector = () => {
+    if (loading) {
+      return (
+        <View style={styles.categoryLoading}>
+          <ActivityIndicator size="small" color="#007AFF" />
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.categoryGrid}>
+        {categories.map((category) => (
+          <TouchableOpacity
+            key={category}
+            style={[
+              styles.categoryOption,
+              formData.category === category && styles.categoryOptionSelected,
+            ]}
+            onPress={() => handleInputChange('category', category)}
+          >
+            <Text
+              style={[
+                styles.categoryOptionText,
+                formData.category === category && styles.categoryOptionTextSelected,
+              ]}
+            >
+              {category.charAt(0).toUpperCase() + category.slice(1)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+    >
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Create New Product</Text>
+          <Text style={styles.headerSubtitle}>Fill in the product details below</Text>
+        </View>
+
+        <View style={styles.form}>
+          {/* Title Field */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Product Title <Text style={styles.required}>*</Text></Text>
+            <TextInput
+              style={[styles.input, errors.title && styles.inputError]}
+              placeholder="Enter product title"
+              value={formData.title}
+              onChangeText={(text) => handleInputChange('title', text)}
+              maxLength={100}
+            />
+            {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
+          </View>
+
+          {/* Price Field */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Price ($) <Text style={styles.required}>*</Text></Text>
+            <TextInput
+              style={[styles.input, errors.price && styles.inputError]}
+              placeholder="0.00"
+              value={formData.price}
+              onChangeText={(text) => handleInputChange('price', text)}
+              keyboardType="decimal-pad"
+              maxLength={10}
+            />
+            {errors.price && <Text style={styles.errorText}>{errors.price}</Text>}
+          </View>
+
+          {/* Category Field */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Category <Text style={styles.required}>*</Text></Text>
+            {renderCategorySelector()}
+            {errors.category && <Text style={styles.errorText}>{errors.category}</Text>}
+          </View>
+
+          {/* Image URL Field */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Image URL <Text style={styles.required}>*</Text></Text>
+            <TextInput
+              style={[styles.input, errors.image && styles.inputError]}
+              placeholder="https://example.com/image.jpg"
+              value={formData.image}
+              onChangeText={(text) => handleInputChange('image', text)}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {errors.image && <Text style={styles.errorText}>{errors.image}</Text>}
+          </View>
+
+          {/* Description Field */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Description <Text style={styles.required}>*</Text></Text>
+            <TextInput
+              style={[styles.textArea, errors.description && styles.inputError]}
+              placeholder="Enter product description..."
+              value={formData.description}
+              onChangeText={(text) => handleInputChange('description', text)}
+              multiline
+              numberOfLines={6}
+              textAlignVertical="top"
+              maxLength={500}
+            />
+            <Text style={styles.charCount}>
+              {formData.description.length}/500 characters
+            </Text>
+            {errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
+          </View>
+
+          {/* Preview Section */}
+          {formData.image && !errors.image && (
+            <View style={styles.previewContainer}>
+              <Text style={styles.previewLabel}>Image Preview:</Text>
+              <View style={styles.previewImageContainer}>
+                <Text style={styles.previewText}>URL: {formData.image}</Text>
+                <Text style={styles.previewNote}>
+                  Note: Image will be displayed in the product list
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Action Buttons */}
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={[styles.button, styles.cancelButton]}
+              onPress={handleCancel}
+              disabled={submitting}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.button, styles.submitButton, submitting && styles.buttonDisabled]}
+              onPress={handleSubmit}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.submitButtonText}>Create Product</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  scrollContent: {
+    padding: 20,
+  },
+  header: {
+    marginBottom: 30,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: '#666',
+  },
+  form: {
+    backgroundColor: '#fff',
+    borderRadius: 15,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  field: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  required: {
+    color: '#ff3b30',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  textArea: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    fontSize: 16,
+    backgroundColor: '#fff',
+    minHeight: 120,
+  },
+  inputError: {
+    borderColor: '#ff3b30',
+    backgroundColor: '#fff2f2',
+  },
+  errorText: {
+    color: '#ff3b30',
+    fontSize: 14,
+    marginTop: 5,
+  },
+  charCount: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'right',
+    marginTop: 5,
+  },
+  categoryLoading: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  categoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -5,
+  },
+  categoryOption: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 20,
+    margin: 5,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+  },
+  categoryOptionSelected: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  categoryOptionText: {
+    fontSize: 14,
+    color: '#333',
+    textTransform: 'capitalize',
+  },
+  categoryOptionTextSelected: {
+    color: '#fff',
+  },
+  previewContainer: {
+    marginTop: 10,
+    marginBottom: 20,
+    padding: 15,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  previewLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 10,
+  },
+  previewImageContainer: {
+    alignItems: 'center',
+  },
+  previewText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+  },
+  previewNote: {
+    fontSize: 12,
+    color: '#999',
+    fontStyle: 'italic',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  button: {
+    flex: 1,
+    paddingVertical: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#ff3b30',
+    marginRight: 10,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ff3b30',
+  },
+  submitButton: {
+    backgroundColor: '#007AFF',
+    marginLeft: 10,
+  },
+  submitButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+});
+
+export default CreateProduct;
+
+
+
+
+-----------------------------
+
+######################################################
+
+src/services
+     -productService.js
+
+-------------------------
+import api from '../utils/api';
+
+export const productService = {
+  // Get all products
+  getAllProducts: async () => {
+    try {
+      const response = await api.get('/products');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Get single product by ID
+  getProductById: async (id) => {
+    try {
+      const response = await api.get(`/products/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Get products by category
+  getProductsByCategory: async (category) => {
+    try {
+      const response = await api.get(`/products/category/${category}`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Get all categories
+  getAllCategories: async () => {
+    try {
+      const response = await api.get('/products/categories');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Add new product
+  addProduct: async (productData) => {
+    try {
+      const response = await api.post('/products', productData);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Update product
+  updateProduct: async (id, productData) => {
+    try {
+      const response = await api.put(`/products/${id}`, productData);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Delete product
+  deleteProduct: async (id) => {
+    try {
+      const response = await api.delete(`/products/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+};
+
+
+
+
+--------------------------------
